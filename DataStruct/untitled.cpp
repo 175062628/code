@@ -74,7 +74,6 @@ public:
 		f(f,root);
 	}
 	void bfs(){
-		if(!root) return;
 		queue<TreeNode<T>*> q;
 		q.push(root);
 		while(!q.empty()){
@@ -158,7 +157,6 @@ private:
 		if(!cur) return;
 		int t=cur->insertPos(val);
 		if(cur->values[t]!=val){
-			if(cur->isLeaf) return;
 			erase(cur->children[t],val,t);
 		}
 		else{
@@ -168,7 +166,7 @@ private:
 			else{
 				T new_val=getNext(cur->children[t+1]);
 				cur->values[t]=new_val;
-				erase(cur->children[t+1],new_val,t+1);
+				erase(cur->children[t+1],new_val,t+1);	
 			}
 		}
 		if(cur==root||cur->values.size()>=(m-1)/2) return;
@@ -205,18 +203,16 @@ private:
 			p->children[pos-1]->combine(cur);
 			
 			p->children.erase(p->children.begin()+pos);
+			return;
 		}
 		// 右节点存在且键值数为最小度，找右节点合并
-		else{
+		if(pos< p->children.size()-1){
 			cur->values.push_back(p->values[pos]);
 			p->values.erase(p->values.begin()+pos);
 			cur->combine(p->children[pos+1]);
 			
 			p->children.erase(p->children.begin()+pos+1);
-		}
-		// 检查一下根节点
-		if(cur->parent==root&&root->values.empty()){
-			root=cur;
+			return;
 		}
 	}
 	T getNext(TreeNode<T>* cur){
@@ -234,9 +230,12 @@ int main(){
 	for(auto& c:s){
 		v.push_back(c);
 	}
-	BTree<char,4> test(v);
-	for(int i=0;i<19;i++){
-		test.erase('a'+i);
-	}
+	BTree<char,3> test(v);
+	test.bfs();
+	test.erase('h');
+	test.bfs();
+	test.erase('k');
+	test.bfs();
+	test.erase('z');
 	test.bfs();
 }

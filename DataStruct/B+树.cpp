@@ -1,11 +1,12 @@
 #include<bits/stdc++.h>
 using namespace std;
 template<typename T,int m=4>
-class BTree{
+class BPlusTree{
 	template<class U>
 	struct TreeNode{
 		bool isLeaf=true;
 		TreeNode<T>* parent=nullptr;
+		TreeNode<T>* next=nullptr;
 		// 最多m-1个值
 		vector<T> values;
 		// 最多m个孩子
@@ -16,12 +17,12 @@ class BTree{
 			values.push_back(v);
 		}
 		// 分裂节点构造
-		TreeNode(TreeNode<T>*& root,bool leaf,int l,int r,TreeNode<T>* p=nullptr):isLeaf(leaf),parent(p){
+		TreeNode(TreeNode<T>*& root,bool leaf,int l,int r,TreeNode<T>* next=nullptr,TreeNode<T>* parent=nullptr):isLeaf(leaf),next(next),parent(parent){
 			for(int i=l;i<r;i++){
 				values.push_back(root->values[i]);
 			}
 			if(root->isLeaf) return;
-			for(int i=l;i<=r;i++){
+			for(int i=l;i<r;i++){
 				root->children[i]->parent=this;
 				children.push_back(root->children[i]);
 			}
@@ -36,6 +37,7 @@ class BTree{
 			}
 			return res;
 		}
+		
 		void show(){
 			for(auto& val:values){
 				cout<<val<<" ";
@@ -46,14 +48,12 @@ class BTree{
 			for(auto& x:cur->values){
 				values.push_back(x);
 			}
-			for(auto& x:cur->children){
-				children.push_back(x);
-			}
+			this->next=cur->next;
 		}
 	};
 public:
-	BTree(){}
-	BTree(vector<T>& nums){
+	BPlusTree(){}
+	BPlusTree(vector<T>& nums){
 		for(auto& num:nums){
 			insert(num);
 		}
@@ -73,8 +73,28 @@ public:
 		
 		f(f,root);
 	}
+	void lkshow(){
+		TreeNode<T>* t=root;
+		while(!t->children.empty()){
+			TreeNode<T>* p=t;
+			while(p){
+				for(auto& val:p->values){
+					cout<<val<<" ";
+				}
+				p=p->next;
+			}
+			t=t->children[0];
+			cout<<endl;
+		}
+		while(t){
+			for(auto& val:t->values){
+				cout<<val<<" ";
+			}
+			t=t->next;
+		}
+		cout<<endl;
+	}
 	void bfs(){
-		if(!root) return;
 		queue<TreeNode<T>*> q;
 		q.push(root);
 		while(!q.empty()){
@@ -103,26 +123,25 @@ public:
 		erase(root,val);
 	}
 private:
-	// 插入有两种方法
-	// 先判断填满，再添加(路径上有满节点就先分裂  知乎/算法导论)
-	// 算法导论指出 B树除根节点外的所有节点，最小度为t-1，最大度为2t-1
-	// 故根据算法导论，本人有个推论，B树只能为偶数阶(但实操的时候并不是如此)
-	
-	// 先添加，再判断填满(数据结构：C++实现(第2版)/维基百科)
-	// 在此本人使用了先添加的方法
 	void insert(TreeNode<T>* cur,T val){
 		auto f=[&](TreeNode<T>*& cur)->void{
 			// 中位数节点
-			T mid=cur->values[m/2];
-			TreeNode<T>* l=new TreeNode<T>(cur,cur->isLeaf,0,m/2,cur->parent);
-			TreeNode<T>* r=new TreeNode<T>(cur,cur->isLeaf,m/2+1,m,cur->parent);
+			T mid=cur->values[(m-1)/2];
+			// 构造新节点会引起next指向cur的节点指针问题，所以在B+树中采用原地修改cur的方法
+			while(cur->values.size()>(m+1)/2){
+				cur->values.pop_back();
+				if(!cur->children.empty()) cur->children.pop_back();
+			}
+			TreeNode<T>* r=new TreeNode<T>(cur,cur->isLeaf,(m+1)/2,m,cur->next,cur->parent);
+			cur->next=r;
 			
 			// 根节点分裂
 			if(!cur->parent){
 				TreeNode<T>* new_r=new TreeNode<T>(mid,false);
-				l->parent=new_r;
+				new_r->values.push_back(r->values.back());
+				cur->parent=new_r;
 				r->parent=new_r;
-				new_r->children.push_back(l);
+				new_r->children.push_back(cur);
 				new_r->children.push_back(r);
 				root=new_r;
 				cur=root;
@@ -133,7 +152,6 @@ private:
 			int t=p->insertPos(mid);
 			
 			p->values.insert(p->values.begin()+t,mid);
-			p->children[t]=l;
 			p->children.insert(p->children.begin()+t+1,r);
 			cur=p;
 		};
@@ -145,7 +163,14 @@ private:
 			return;
 		}
 		int t=cur->insertPos(val);
-		if(!cur->isLeaf) insert(cur->children[t],val);
+		
+		if(!cur->isLeaf){
+			if(t==cur->values.size()){
+				t--;
+				cur->values[t]=val;
+			}
+			insert(cur->children[t],val);
+		}
 		else{
 			cur->values.insert(cur->values.begin()+t,val);
 			while(cur&&cur->values.size()==m){
@@ -158,7 +183,6 @@ private:
 		if(!cur) return;
 		int t=cur->insertPos(val);
 		if(cur->values[t]!=val){
-			if(cur->isLeaf) return;
 			erase(cur->children[t],val,t);
 		}
 		else{
@@ -168,7 +192,7 @@ private:
 			else{
 				T new_val=getNext(cur->children[t+1]);
 				cur->values[t]=new_val;
-				erase(cur->children[t+1],new_val,t+1);
+				erase(cur->children[t+1],new_val,t+1);	
 			}
 		}
 		if(cur==root||cur->values.size()>=(m-1)/2) return;
@@ -198,6 +222,7 @@ private:
 			return;
 		}
 		
+		
 		// 左节点存在且键值数为最小度，找左节点合并
 		if(0<pos){
 			p->children[pos-1]->values.push_back(p->values[pos-1]);
@@ -226,17 +251,16 @@ private:
 		return cur->values.front();
 	}
 	
+	
 	TreeNode<T> *root=nullptr;
 };
+
 int main(){
 	string s="plokmijnuhbygvtfcrdxeszwaq";
 	vector<char> v;
 	for(auto& c:s){
 		v.push_back(c);
 	}
-	BTree<char,4> test(v);
-	for(int i=0;i<19;i++){
-		test.erase('a'+i);
-	}
+	BPlusTree<char,4> test(v);
 	test.bfs();
 }
